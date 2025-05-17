@@ -1,81 +1,49 @@
-// src/components/ImageAnonymizer.jsx
-import React, { useCallback, useState, useRef } from "react";
+// frontend/src/components/ImageAnonymizer.jsx
+import React, { useCallback, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import Tesseract from "tesseract.js";
 import nlp from "compromise";
-import { v4 as uuidv4 } from "uuid";
+
+
+
+
+fetch("http://localhost:3001/upload", {
+  method: "POST",
+});
+
+
 
 export default function ImageAnonymizer() {
+  const [inputText, setInputText] = useState("");
+  const [outputText, setOutputText] = useState("");
   const [processing, setProcessing] = useState(false);
-  const [outputUrl, setOutputUrl] = useState(null);
   const imgRef = useRef();
-  const canvasRef = useRef();
+
+  const anonymizeText = (text) => {
+    const doc = nlp(text);
+    doc.people().replaceWith("[NAME]");
+    doc.places().replaceWith("[PLACE]");
+    doc.organizations().replaceWith("[ORG]");
+    const noPhones = text.replace(/\+?\d{10,}/g, "[PHONE]");
+    const noAddresses = noPhones.replace(
+      /ул\.|улица|проспект|дом\s\d+/gi,
+      "[ADDRESS]"
+    );
+    return doc.text().replace(text, noAddresses);
+  };
 
   const onDrop = useCallback(async (files) => {
     setProcessing(true);
-    setOutputUrl(null);
-
-    // 1. Показываем исходник в скрытом img для получения размеров
     const file = files[0];
-    const objectUrl = URL.createObjectURL(file);
-    imgRef.current.src = objectUrl;
+    const imageUrl = URL.createObjectURL(file);
+    imgRef.current.src = imageUrl;
     await new Promise((r) => (imgRef.current.onload = r));
 
-    // 2. OCR
     const result = await Tesseract.recognize(file, "rus+eng");
-    console.log("Результат Tesseract:", result);
-
-    const words = result?.data?.words;
-
-    if (!words || !Array.isArray(words)) {
-      console.error("Ошибка: words не определены или не массив");
-      setProcessing(false);
-      return;
-    }
-
-
-    // 3. Ищем PII по каждому слову
-    const boxes = [];
-    for (const { text, bbox } of words) {
-      const clean = text.trim();
-      if (!clean) continue;
-      const doc = nlp(clean);
-      const isPII =
-        doc.people().length > 0 ||
-        doc.places().length > 0 ||
-        doc.organizations().length > 0 ||
-        /^\d{12}$/.test(clean);
-      if (isPII) {
-        boxes.push({
-          x: bbox.x0,
-          y: bbox.y0,
-          w: bbox.x1 - bbox.x0,
-          h: bbox.y1 - bbox.y0,
-        });
-      }
-    }
-
-    // 4. Рисуем на canvas
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    canvas.width = imgRef.current.naturalWidth;
-    canvas.height = imgRef.current.naturalHeight;
-    ctx.drawImage(imgRef.current, 0, 0);
-    ctx.fillStyle = "rgba(0,0,0,0.6)";
-    for (const b of boxes) {
-      ctx.fillRect(b.x, b.y, b.w, b.h);
-    }
-
-    // 5. Экспортируем результат
-    canvas.toBlob(
-      (blob) => {
-        setOutputUrl(URL.createObjectURL(blob));
-        setProcessing(false);
-        URL.revokeObjectURL(objectUrl);
-      },
-      "image/jpeg",
-      0.9
-    );
+    const rawText = result.data.text;
+    const cleaned = anonymizeText(rawText);
+    setInputText(cleaned);
+    setProcessing(false);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -84,49 +52,70 @@ export default function ImageAnonymizer() {
     multiple: false,
   });
 
+  const handleSend = async () => {
+    if (!inputText) return;
+    setProcessing(true);
+    const res = await fetch("http://localhost:3001/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ input: inputText }),
+    });
+    const data = await res.json();
+    setOutputText(data.text);
+    setProcessing(false);
+  };
+
   return (
-    <div style={{ textAlign: "center", color: "#fff" }}>
-      <h2>Анонимизатор Фото</h2>
+    <div style={{ padding: 30, maxWidth: 800, margin: "auto", color: "#fff" }}>
+      <h2>📷 Анонимизатор Фото / Текста</h2>
+
       <div
         {...getRootProps()}
         style={{
-          margin: "auto",
-          padding: 20,
           border: "2px dashed #888",
-          borderRadius: 8,
-          width: 300,
+          padding: 20,
           cursor: "pointer",
-          background: isDragActive ? "#333" : "transparent",
+          borderRadius: 8,
         }}
       >
         <input {...getInputProps()} />
         {isDragActive ? (
-          <p>Отпустите изображение для анонимизации</p>
+          <p>Отпустите изображение</p>
         ) : (
-          <p>Перетащите фото или кликните</p>
+          <p>Перетащите фото или кликните для загрузки</p>
         )}
       </div>
-      {processing && <p>Обработка изображения…</p>}
-      <div style={{ marginTop: 20 }}>
-        <img ref={imgRef} alt="" style={{ display: "none" }} />
-        <canvas ref={canvasRef} style={{ maxWidth: "100%" }} />
-      </div>
-      {outputUrl && (
-        <a
-          href={outputUrl}
-          download={`anon-${uuidv4()}.jpg`}
+
+      <img ref={imgRef} alt="preview" style={{ display: "none" }} />
+
+      <textarea
+        placeholder="Или вставьте текст вручную..."
+        rows={8}
+        value={inputText}
+        onChange={(e) => setInputText(e.target.value)}
+        style={{ width: "100%", marginTop: 20, padding: 10 }}
+      />
+
+      <button
+        onClick={handleSend}
+        disabled={processing}
+        style={{ marginTop: 20 }}
+      >
+        {processing ? "Обработка..." : "Отправить в Gemini"}
+      </button>
+
+      {outputText && (
+        <div
           style={{
-            display: "inline-block",
-            marginTop: 15,
-            padding: "10px 20px",
-            background: "#3b82f6",
-            color: "#fff",
-            borderRadius: 6,
-            textDecoration: "none",
+            marginTop: 30,
+            background: "#222",
+            padding: 20,
+            borderRadius: 8,
           }}
         >
-          Скачать анонимизированное фото
-        </a>
+          <h4>💡 Ответ</h4>
+          <pre>{outputText}</pre>
+        </div>
       )}
     </div>
   );
