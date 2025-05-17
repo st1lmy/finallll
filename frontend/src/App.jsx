@@ -38,7 +38,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ maxWidth: "600px", margin: "0 auto", padding: "20px" }}>
+    <div style={}>
       <h1>Анонимизатор данных</h1>
 
       <div>
