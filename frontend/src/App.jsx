@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import "./App.css"
+
 
 export default function App() {
   const [text, setText] = useState("");
@@ -38,10 +40,10 @@ export default function App() {
   };
 
   return (
-    <div style={}>
+    <div className="dannye">
       <h1>Анонимизатор данных</h1>
 
-      <div>
+      <div className="text-anim">
         <h2>Анонимизировать текст</h2>
         <textarea
           rows="5"
@@ -52,13 +54,13 @@ export default function App() {
         <button onClick={handleTextSubmit}>Анонимизировать текст</button>
       </div>
 
-      <div style={{ marginTop: "20px" }}>
+      <div className="text-img">
         <h2>Анонимизировать изображение</h2>
         <input type="file" accept="image/*" onChange={handleImageChange} />
         <button onClick={handleImageSubmit}>Анонимизировать изображение</button>
       </div>
 
-      <div style={{ marginTop: "20px" }}>
+      <div className="result-text">
         <h2>Результат</h2>
         <p>{result || "Здесь появится результат"}</p>
       </div>
