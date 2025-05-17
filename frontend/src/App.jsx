@@ -1,69 +1,20 @@
-import React, { useState } from "react";
-import "./App.css"
+import React, { useState, useCallback } from "react";
+// Просто импортируем из пакета
+import nlp from "compromise";
+import { v4 as uuidv4 } from "uuid";
+import { useDropzone } from "react-dropzone";
+import ImageAnonymizer from './components/ImageAnonymizer';
+import './App.css';
+
+
+
 
 
 export default function App() {
-  const [text, setText] = useState("");
-  const [image, setImage] = useState(null);
-  const [result, setResult] = useState("");
-
-  const handleTextChange = (e) => setText(e.target.value);
-
-  const handleImageChange = (e) => setImage(e.target.files[0]);
-
-  const handleTextSubmit = async () => {
-    try {
-      const response = await fetch(import.meta.env.VITE_API_URL + "/text", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-
-      const data = await response.json();
-      setResult(data.anonymized);
-    } catch (error) {
-      console.error("Error: ", error);
-    }
-  };
-
-  const handleImageSubmit = async () => {
-    const formData = new FormData();
-    formData.append("file", image);
-
-    const response = await fetch(import.meta.env.VITE_API_URL + "/image", {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await response.json();
-    setResult(data.text);
-  };
-
   return (
-    <div className="dannye">
-      <h1>Анонимизатор данных</h1>
-
-      <div className="text-anim">
-        <h2>Анонимизировать текст</h2>
-        <textarea
-          rows="5"
-          value={text}
-          onChange={handleTextChange}
-          placeholder="Введите текст"
-        />
-        <button onClick={handleTextSubmit}>Анонимизировать текст</button>
-      </div>
-
-      <div className="text-img">
-        <h2>Анонимизировать изображение</h2>
-        <input type="file" accept="image/*" onChange={handleImageChange} />
-        <button onClick={handleImageSubmit}>Анонимизировать изображение</button>
-      </div>
-
-      <div className="result-text">
-        <h2>Результат</h2>
-        <p>{result || "Здесь появится результат"}</p>
-      </div>
+    <div className="app-wrapper">
+      {/* Можно оставить заголовок или обернуть компонент в контейнер */}
+      <ImageAnonymizer />
     </div>
   );
 }
